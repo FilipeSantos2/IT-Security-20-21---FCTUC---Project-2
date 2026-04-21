@@ -1,0 +1,4 @@
+block tcp any any -> any any (msg: "UNION SQL Injection BLOCKED"; pcre: "/((\ % 22) | (\ % 27) | (') | ("))(\s)*union/ix"; sid:100000001; )
+block tcp any any -> any any (msg: "BOOLEAN SQL Injection BLOCKED"; content: "\" OR \"1\"=\"1\"" , nocase; sid:100000002; )
+block tcp any any -> any any (msg: "BOOLEAN SQL Injection BLOCKED"; content: "\' OR \'1\'=\'1\'" , nocase; sid:100000003; )
+block tcp any any -> any any (msg: "Cross-Site Scripting - markup injection BLOCKED"; pcre: "/((\%3C)|<)((\%2F)|\/)*[a-z0-9\%]+((\%3E)|>)/i"; sid:100000004; )

@@ -1,0 +1,486 @@
+=========================== Configurações - Redes ===========================
+Máquina Router (Máquina 1):
+	Router_to_DMZ:
+		23.214.219.254 / 255.255.255.128
+
+	Router_to_Internal_Network:
+		192.168.10.254 / 255.255.255.0
+
+	Router_to_Internet:
+		87.248.214.97 / 255.255.255.0
+
+Máquina DMZ (Máquina 2):
+	Router_to_DMZ:
+		23.214.219.128/25
+
+		(mail): 23.214.219.129 / 255.255.255.128
+		(dns): 23.214.219.130 / 255.255.255.128
+		(smtp): 23.214.219.131 / 255.255.255.128
+		(www): 23.214.219.132 / 255.255.255.128
+		(vpn-gw): 23.214.219.133 / 255.255.255.128
+
+Máquina Internal Network (Máquina 2 e 3):
+	Router_to_Internal_Network:
+		192.168.10.0/24
+
+		(DHCP client): 192.168.10.1 / 255.255.255.0
+		(DHCP client): 192.168.10.2 / 255.255.255.0
+		(DHCP client): 192.168.10.3 / 255.255.255.0
+		(datastore): 192.168.10.4 / 255.255.255.0
+		(ftp): 192.168.10.5 / 255.255.255.0
+
+
+Máquina Internet (Máquina 3):
+	Router_to_Internet:
+		87.248.214.0/24
+
+		(dns2): 87.248.214.1 / 255.255.255.0
+		(eden): 87.248.214.2 / 255.255.255.0
+
+
+
+Máquina 2:
+	(DMZ to Internet)
+		route add -net 87.248.214.0/24 gw 23.214.219.254 
+	(Internal Network to Internet)
+		route add -net 87.248.214.0/24 gw 192.168.10.254 
+	(DMZ to Internal Network)
+		route add -net 192.168.10.0/24 gw 23.214.219.254 
+
+Máquina 3:
+	(Internet to DMZ)
+		route add -net 23.214.219.128/25 gw 87.248.214.97 
+	(Internet to Internal Network)
+		route add -net 192.168.10.0/24 gw 87.248.214.97 
+	(Internal Network to DMZ)
+		route add -net 23.214.219.128/25 gw 192.168.10.254 
+
+
+==================== General commands ====================
+
+Show IP tables
+
+	iptables -L
+
+Delete IP tables
+	
+	iptables -F
+
+Show NAT IP tables
+
+	iptables -t nat -L
+
+Delete NAT IP tables
+	
+	iptables -t nat -F
+
+
+Check information about ports
+
+	gedit /etc/services
+
+Stop Firewall (Máquinas 2 e 3)
+	systemctl unmask firewalld
+	systemctl stop firewalld
+	systemctl disable firewalld
+	systemctl mask firewalld
+	systemctl unmask iptables
+	systemctl enable iptables
+	systemctl stop iptables
+	systemctl disable iptables
+
+
+==================== FTP ====================
+ftp (Instalar o ftp)
+yum install vsftpd
+systemctl start vsftpd
+systemctl enable vsftpd
+
+gedit /etc/vsftpd.conf
+	local_enable=YES
+	write_enable=YES
+	pasv_enable=YES
+	pasv_promiscuous=YES
+	-> Fazer restart do vsftpd (systemctl restart vsftpd)
+
+
+Stop vsftp
+	systemctl stop vsftpd
+	systemctl disable vsftpd
+
+
+Enable nf_conntrack_ftp and other necessary modules for ftp
+	gedit /etc/sysconfig/iptables-config
+		-> IPTABLES_MODULES="nf_conntrack_ftp nf_conntrack_tftp nf_nat_ftp nf_nat_tftp"
+	echo 1 > /proc/sys/net/netfilter/nf_conntrack_helper
+	gedit /etc/modprobe.d/iptables.conf
+		-> options nf_conntrack_ftp ports=21
+		-> options nf_nat_ftp ports=21
+	systemctl restart iptables
+
+	lsmod | grep ftp
+
+==================== Net Cat ====================
+(tcp - default)
+	server: nc -v -l port
+	client: nc -v target port
+
+(udp)
+	server: nc -v -u -l port
+	client: nc -v -u target port
+
+
+==================== Stop Ports ====================
+ssh (22)
+	Stop
+		systemctl stop sshd
+	Start
+		systemctl start sshd
+
+dns (53)
+	https://www.linuxuprising.com/2020/07/ubuntu-how-to-free-up-port-53-used-by.html
+	Stop
+		gedit /etc/systemd/resolved.conf
+			-> Add/Uncomment
+				DNS=1.1.1.1
+				DNSStubListener=no
+		sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+		reboot
+
+	Start
+		gedit /etc/systemd/resolved.conf
+			->Comment
+				DNS=1.1.1.1
+				DNSStubListener=no
+		sudo rm /etc/resolv.conf
+		reboot
+
+
+==================== 3. Packet filtering and NAT using IPTables ====================
+
+Firewall configuration to protect the router:
+	
+	"The firewall configuration should drop all communications entering the router system"
+		
+		(Policy):
+			iptables -P OUTPUT DROP
+			iptables -P INPUT DROP
+
+
+
+
+
+
+	"DNS name resolution requests sent to outside servers."
+
+		domain          53/tcp                          # name-domain server
+		(From router to dns)
+			iptables -A INPUT -s 23.214.219.130 -p tcp --sport domain -j ACCEPT
+			iptables -A OUTPUT -d 23.214.219.130 -p tcp --dport domain -j ACCEPT
+		(From router to dns2)
+			iptables -A INPUT -s 87.248.214.1 -p tcp --sport domain -j ACCEPT
+			iptables -A OUTPUT -d 87.248.214.1 -p tcp --dport domain -j ACCEPT
+		(From router to eden)
+			iptables -A INPUT -s 87.248.214.2 -p tcp --sport domain -j ACCEPT
+			iptables -A OUTPUT -d 87.248.214.2 -p tcp --dport domain -j ACCEPT
+
+		domain          53/udp
+		(From router to dns)
+			iptables -A INPUT -s 23.214.219.130 -p udp --sport domain -j ACCEPT
+			iptables -A OUTPUT -d 23.214.219.130 -p udp --dport domain -j ACCEPT
+		(From router to dns2)
+			iptables -A INPUT -s 87.248.214.1 -p udp --sport domain -j ACCEPT
+			iptables -A OUTPUT -d 87.248.214.1 -p udp --dport domain -j ACCEPT
+		(From router to eden)
+			iptables -A INPUT -s 87.248.214.2 -p udp --sport domain -j ACCEPT
+			iptables -A OUTPUT -d 87.248.214.2 -p udp --dport domain -j ACCEPT
+
+
+
+
+
+
+	"SSH connections to the router system, if originated at the internal network or at the VPN gateway (vpn-gw)."
+
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+			iptables -A INPUT -s 192.168.10.0/24 -p tcp --dport ssh -j ACCEPT
+			iptables -A OUTPUT -d 192.168.10.0/24 -p tcp --sport ssh -j ACCEPT
+
+			iptables -A INPUT -s 23.214.219.133 -p tcp --dport ssh -j ACCEPT
+			iptables -A OUTPUT -d 23.214.219.133 -p tcp --sport ssh -j ACCEPT
+
+
+
+
+
+
+
+Firewall configuration to authorize direct communications (without NAT):
+
+	"The firewall configuration should drop all communications between networks"
+
+		(Policy):
+			iptables -P FORWARD DROP
+
+
+
+
+
+
+	"Domain name resolutions using the dns server."
+
+		domain          53/tcp                          # name-domain server
+			iptables -A FORWARD -d 23.214.219.130 -p tcp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.130 -p tcp --sport domain -j ACCEPT
+
+
+		domain          53/udp
+			iptables -A FORWARD -d 23.214.219.130 -p udp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.130 -p udp --sport domain -j ACCEPT
+
+
+
+
+
+
+	"The dns server should be able to resolve names using DNS servers on the Internet (dns2 and also others)."
+
+
+		domain          53/tcp                          # name-domain server
+		(from dns to dns2)
+			iptables -A FORWARD -d 87.248.214.1 -s 23.214.219.130 -p tcp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.1 -d 23.214.219.130 -p tcp --sport domain -j ACCEPT
+		(from dns to eden)
+			iptables -A FORWARD -d 87.248.214.2 -s 23.214.219.130 -p tcp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.2 -d 23.214.219.130 -p tcp --sport domain -j ACCEPT
+
+
+		domain          53/udp
+		(from dns to dns2)
+			iptables -A FORWARD -d 87.248.214.1 -s 23.214.219.130 -p udp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.1 -d 23.214.219.130 -p udp --sport domain -j ACCEPT
+		(from dns to eden)
+			iptables -A FORWARD -d 87.248.214.2 -s 23.214.219.130 -p udp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.2 -d 23.214.219.130 -p udp --sport domain -j ACCEPT
+
+
+
+
+
+
+	"The dns and dns2 servers should be able to synchronize the contents of DNS zones."
+
+		domain          53/tcp                          # name-domain server
+		(from dns2 to dns)
+			iptables -A FORWARD -d 23.214.219.130 -s 87.248.214.1 -p tcp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.130 -d 87.248.214.1 -p tcp --sport domain -j ACCEPT
+
+		domain          53/udp
+		(from dns2 to dns)
+			iptables -A FORWARD -d 23.214.219.130 -s 87.248.214.1 -p udp --dport domain -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.130 -d 87.248.214.1 -p udp --sport domain -j ACCEPT
+
+
+
+
+
+
+	"SMTP connections to the smtp server."
+
+		smtp            25/tcp          mail
+			iptables -A FORWARD -d 23.214.219.131 -p tcp --dport smtp -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.131 -p tcp --sport smtp -j ACCEPT
+
+
+
+
+
+
+	"POP and IMAP connections to the mail server."
+
+		pop2            109/tcp         pop-2 postoffice        # POP version 2
+			iptables -A FORWARD -d 23.214.219.129 -p tcp --dport pop2 -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.129 -p tcp --sport pop2 -j ACCEPT
+
+
+		pop3            110/tcp         pop-3           # POP version 3
+			iptables -A FORWARD -d 23.214.219.129 -p tcp --dport pop3 -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.129 -p tcp --sport pop3 -j ACCEPT
+
+
+		imap            143/tcp         imap2           # Interim Mail Access Proto v2
+			iptables -A FORWARD -d 23.214.219.129 -p tcp --dport imap -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.129 -p tcp --sport imap -j ACCEPT
+
+
+
+
+
+
+	"HTTP and HTTPS connections to the www server."
+
+		http            80/tcp          www www-http    # WorldWideWeb HTTP
+			iptables -A FORWARD -d 23.214.219.132 -p tcp --dport http -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.132 -p tcp --sport http -j ACCEPT
+
+
+		https           443/tcp                         # http protocol over TLS/SSL
+			iptables -A FORWARD -d 23.214.219.132 -p tcp --dport https -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.132 -p tcp --sport https -j ACCEPT
+
+
+		https           443/udp                         # http protocol over TLS/SSL
+			iptables -A FORWARD -d 23.214.219.132 -p udp --dport https -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.132 -p udp --sport https -j ACCEPT
+
+
+
+
+
+
+	"OpenVPN connections to the vpn-gw server."
+
+		openvpn         1194/tcp                # OpenVPN
+			iptables -A FORWARD -d 23.214.219.133 -p tcp --dport openvpn -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.133 -p tcp --sport openvpn -j ACCEPT
+
+
+
+		openvpn         1194/udp                # OpenVPN
+			iptables -A FORWARD -d 23.214.219.133 -p udp --dport openvpn -j ACCEPT
+			iptables -A FORWARD -s 23.214.219.133 -p udp --sport openvpn -j ACCEPT
+
+
+
+
+
+
+	"VPN clients connected to the gateway (vpn-gw) should able to connect to the PosgreSQL service on the datastore server."
+
+		postgres        5432/tcp        postgresql      # POSTGRES
+			iptables -A FORWARD -d 192.168.10.4 -s 23.214.219.133 -p tcp --dport postgres -j ACCEPT
+			iptables -A FORWARD -s 192.168.10.4 -d 23.214.219.133 -p tcp --sport postgres -j ACCEPT
+
+
+
+
+
+
+Firewall configuration for connections to the external IP address of the firewall (using NAT):
+
+	
+
+	"FTP connections (in passive and active modes) to the ftp server."
+
+		Deal with dynamic ports
+			iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+		iptables -t nat -A PREROUTING -s 87.248.214.0/24 -d 87.248.214.97 -p tcp --dport ftp -j DNAT --to-destination 192.168.10.5
+		iptables -A FORWARD -d 192.168.10.5 -s 87.248.214.0/24 -p tcp --dport ftp -j ACCEPT
+		iptables -A FORWARD -s 192.168.10.5 -d 87.248.214.0/24 -p tcp --sport ftp-data -j ACCEPT
+
+
+
+
+
+
+	"SSH connections to the datastore server, but only if originated at the eden or dns2 servers."
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+		(From dns2 to datastore)
+			iptables -t nat -A PREROUTING -s 87.248.214.1 -d 87.248.214.97 -p tcp --dport ssh -j DNAT --to-destination 192.168.10.4
+			iptables -A FORWARD -d 192.168.10.4 -s 87.248.214.1 -p tcp --dport ssh -j ACCEPT
+			iptables -A FORWARD -s 192.168.10.4 -d 87.248.214.1 -p tcp --sport ssh -j ACCEPT
+
+
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+		(From eden to datastore)
+			iptables -t nat -A PREROUTING -s 87.248.214.2 -d 87.248.214.97 -p tcp --dport ssh -j DNAT --to-destination 192.168.10.4
+			iptables -A FORWARD -d 192.168.10.4 -s 87.248.214.2 -p tcp --dport ssh -j ACCEPT
+			iptables -A FORWARD -s 192.168.10.4 -d 87.248.214.2 -p tcp --sport ssh -j ACCEPT
+
+
+
+
+
+
+Firewall configuration for communications from the internal network to the outside (using NAT)
+
+	
+
+	"Domain name resolutions using DNS."
+	domain          53/tcp                          # name-domain server
+		iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport domain -j SNAT --to-source 87.248.214.97
+		iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport domain -j ACCEPT
+		iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport domain -j ACCEPT
+
+	domain          53/udp
+		iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p udp --dport domain -j SNAT --to-source 87.248.214.97
+		iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p udp --dport domain -j ACCEPT
+		iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p udp --sport domain -j ACCEPT
+
+
+
+
+
+
+	"HTTP, HTTPS and SSH connections."
+		http            80/tcp          www www-http    # WorldWideWeb HTTP
+			iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport http -j SNAT --to-source 87.248.214.97
+			iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport http -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport http -j ACCEPT
+
+		https           443/tcp                         # http protocol over TLS/SSL
+			iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport https -j SNAT --to-source 87.248.214.97
+			iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport https -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport https -j ACCEPT
+
+		https           443/udp                         # http protocol over TLS/SSL
+			iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p udp --dport https -j SNAT --to-source 87.248.214.97
+			iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p udp --dport https -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p udp --sport https -j ACCEPT
+
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+			iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport ssh -j SNAT --to-source 87.248.214.97
+			iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport ssh -j ACCEPT
+			iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport ssh -j ACCEPT
+
+
+
+
+
+
+	"FTP connections (in passive and active modes) to external FTP servers."
+
+		Deal with dynamic ports
+			iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+		iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport ftp -j SNAT --to-source 87.248.214.97
+
+		iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport ftp -j ACCEPT
+		iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport ftp-data -j ACCEPT
+
+
+
+
+
+
+
+=========================== Snort ===========================
+Validate rules
+cd /etc/snort
+snort -R /etc/snort/snort.rules
+
+snort --daq nfq --daq-var queue=0 -A alert_full -Q -c /usr/local/src/snort3/lua/snort.lua -R /etc/snort/snort.rules
+
+Rules for snort:
+	block tcp any any -> any any (msg: "UNION SQL Injection BLOCKED"; pcre: "/((\ % 22) | (\ % 27) | (') | ("))(\s)*union/ix"; sid:100000001; )
+	block tcp any any -> any any (msg: "BOOLEAN SQL Injection BLOCKED"; content: "\" OR \"1\"=\"1\"" , nocase; sid:100000002; )
+	block tcp any any -> any any (msg: "BOOLEAN SQL Injection BLOCKED"; content: "\' OR \'1\'=\'1\'" , nocase; sid:100000003; )
+
+
+	block tcp any any -> any any (msg: "Cross-Site Scripting - markup injection BLOCKED"; pcre: "/((\%3C)|<)((\%2F)|\/)*[a-z0-9\%]+((\%3E)|>)/i"; sid:100000004; )
+
+Iptables:
+	http        80/tcp      
+	iptables -A FORWARD -d 23.214.219.132 -s 87.248.214.0/24 -p tcp --dport http -j NFQUEUE --queue-num 0
+	iptables -A FORWARD -s 23.214.219.132 -d 87.248.214.0/24 -p tcp --sport http -j NFQUEUE --queue-num 0

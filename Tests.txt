@@ -1,0 +1,367 @@
+=========================== Testes ===========================
+Test:
+	Source: nc -v ip port
+	Destination: nc -v -l port
+
+Test (udp):
+	Source: nc -v -u ip port
+	Destination: nc -v -u -l port
+
+
+Firewall configuration to protect the router:
+	
+
+	"DNS name resolution requests sent to outside servers."
+
+		domain          53/tcp                          # name-domain server
+		(From router to dns)
+			Source: nc -v 23.214.219.130 53
+			Destination: nc -v -l 53
+		(From router to dns2)
+			Source: nc -v 87.248.214.1 53
+			Destination: nc -v -l 53
+		(From router to eden)
+			Source: nc -v 87.248.214.2 53
+			Destination: nc -v -l 53
+
+		domain          53/udp
+		(From router to dns)
+			Source: nc -v -u 23.214.219.130 53
+			Destination: nc -v -u -l 53
+		(From router to dns2)
+			Source: nc -v -u 87.248.214.1 53
+			Destination: nc -v -u -l 53
+		(From router to eden)
+			Source: nc -v -u 87.248.214.2 53
+			Destination: nc -v -u -l 53
+
+
+
+
+
+
+	"SSH connections to the router system, if originated at the internal network or at the VPN gateway (vpn-gw)."
+
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+		(From internal network to router)
+			Source: nc -v 192.168.10.254 22
+			Destination: nc -v -l 22
+		(From VPN gateway (vpn-gw) to router)
+			Source: nc -v 23.214.219.254 22
+			Destination: nc -v -l 22
+
+
+
+
+
+
+
+Firewall configuration to authorize direct communications (without NAT):
+
+
+	"Domain name resolutions using the dns server."
+
+		domain          53/tcp                          # name-domain server
+		(To dns server)
+			Source: nc -v 23.214.219.130 53
+			Destination: nc -v -l 53
+
+
+		domain          53/udp
+		(To dns server)
+			Source: nc -v -u 23.214.219.130 53
+			Destination: nc -v -u -l 53
+
+
+
+
+
+
+	"The dns server should be able to resolve names using DNS servers on the Internet (dns2 and also others)."
+
+
+		domain          53/tcp                          # name-domain server
+		(from dns to dns2)
+			Source: nc -v 87.248.214.1 53
+			Destination: nc -v -l 53
+		(from dns to eden)
+			Source: nc -v 87.248.214.2 53
+			Destination: nc -v -l 53
+
+
+		domain          53/udp
+		(from dns to dns2)
+			Source: nc -v -u 87.248.214.1 53
+			Destination: nc -v -u -l 53
+		(from dns to eden)
+			Source: nc -v -u 87.248.214.2 53
+			Destination: nc -v -u -l 53
+
+
+
+
+
+
+	"The dns and dns2 servers should be able to synchronize the contents of DNS zones."
+
+		domain          53/tcp                          # name-domain server
+		(from dns2 to dns)
+			Source: nc -v 23.214.219.130 53
+			Destination: nc -v -l 53
+
+		domain          53/udp
+		(from dns2 to dns)
+			Source: nc -v -u 23.214.219.130 53
+			Destination: nc -v -u -l 53
+
+
+
+
+
+
+	"SMTP connections to the smtp server."
+
+		smtp            25/tcp          mail
+		(To smtp server)
+			Source: nc -v 23.214.219.131 25
+			Destination: nc -v -l 25
+
+
+
+
+
+
+	"POP and IMAP connections to the mail server."
+
+		pop2            109/tcp         pop-2 postoffice        # POP version 2
+		(To mail server)
+			Source: nc -v 23.214.219.129 109
+			Destination: nc -v -l 109
+
+
+		pop3            110/tcp         pop-3           # POP version 3
+		(To mail server)
+			Source: nc -v 23.214.219.129 110
+			Destination: nc -v -l 110
+
+
+		imap            143/tcp         imap2           # Interim Mail Access Proto v2
+		(To mail server)
+			Source: nc -v 23.214.219.129 143
+			Destination: nc -v -l 143
+
+
+
+
+
+
+	"HTTP and HTTPS connections to the www server."
+
+		http            80/tcp          www www-http    # WorldWideWeb HTTP
+		(To www server)
+			Source: nc -v 23.214.219.132 80
+			Destination: nc -v -l 80
+
+			(Use snort if connection is from Internet)
+
+		https           443/tcp                         # http protocol over TLS/SSL
+		(To www server)
+			Source: nc -v 23.214.219.132 443
+			Destination: nc -v -l 443
+
+
+		https           443/udp                         # http protocol over TLS/SSL
+		(To www server)
+			Source: nc -v -u 23.214.219.132 443
+			Destination: nc -v -u -l 443
+
+
+
+
+
+
+
+
+	"OpenVPN connections to the vpn-gw server."
+
+		openvpn         1194/tcp                # OpenVPN
+		(To vpn-gw server)
+			Source: nc -v 23.214.219.133 1194
+			Destination: nc -v -l 1194
+
+
+
+		openvpn         1194/udp                # OpenVPN
+		(To vpn-gw server)
+			Source: nc -v -u 23.214.219.133 1194
+			Destination: nc -v -u -l 1194
+
+
+
+
+
+
+	"VPN clients connected to the gateway (vpn-gw) should able to connect to the PosgreSQL service on the datastore server."
+
+		postgres        5432/tcp        postgresql      # POSTGRES
+		(From vpn-gw to datastore server)
+			Source: nc -v 192.168.10.4 5432
+			Destination: nc -v -l 5432
+
+
+
+
+
+
+Firewall configuration for connections to the external IP address of the firewall (using NAT):
+
+
+	"FTP connections (in passive and active modes) to the ftp server."
+
+		(From internet to ftp server)
+			Router: tshark -i enp0s9 (Internal network)
+					tshark -i enp0s10 (Internet)
+			Source: ftp 87.248.214.97
+				-> name: sti_extra1
+				-> pass:
+				-> ls
+				-> get machine2.txt
+				-> passive
+				-> ls
+				-> get machine2.txt
+			
+
+
+
+
+	"SSH connections to the datastore server, but only if originated at the eden or dns2 servers."
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+		(From dns2 to datastore)
+			Router: tshark -i enp0s9 (Internal network)
+					tshark -i enp0s10 (Internet)
+			Source: nc -v 87.248.214.97 22
+			Destination: nc -v -l 22
+
+
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+		(From eden to datastore)
+			Router: tshark -i enp0s9 (Internal network)
+					tshark -i enp0s10 (Internet)
+			Source: nc -v 87.248.214.97 22
+			Destination: nc -v -l 22
+
+
+
+
+
+
+Firewall configuration for communications from the internal network to the outside (using NAT)
+
+	
+
+	"Domain name resolutions using DNS."
+	domain          53/tcp                          # name-domain server
+		(From internal network to internet)
+			Router: tshark -i enp0s9 (Internal network)
+					tshark -i enp0s10 (Internet)
+			Source: nc -v 87.248.214.2 53
+			Destination: nc -v -l 53
+
+	domain          53/udp
+		(From internal network to internet)
+			Router: tshark -i enp0s9 (Internal network)
+					tshark -i enp0s10 (Internet)
+			Source: nc -v -u 87.248.214.2 53
+			Destination: nc -v -u -l 53
+
+
+
+
+
+
+	"HTTP, HTTPS and SSH connections."
+		http            80/tcp          www www-http    # WorldWideWeb HTTP
+			(From internal network to internet)
+				Router: tshark -i enp0s9 (Internal network)
+						tshark -i enp0s10 (Internet)
+				Source: nc -v 87.248.214.2 80
+				Destination: nc -v -l 80
+
+		https           443/tcp                         # http protocol over TLS/SSL
+			(From internal network to internet)
+				Router: tshark -i enp0s9 (Internal network)
+						tshark -i enp0s10 (Internet)
+				Source: nc -v 87.248.214.2 443
+				Destination: nc -v -l 443
+
+		https           443/udp                         # http protocol over TLS/SSL
+			(From internal network to internet)
+				Router: tshark -i enp0s9 (Internal network)
+						tshark -i enp0s10 (Internet)
+				Source: nc -v -u 87.248.214.2 443
+				Destination: nc -v -u -l 443
+
+
+
+
+		ssh             22/tcp                          # The Secure Shell (SSH) Protocol
+			(From internal network to internet)
+				Router: tshark -i enp0s9 (Internal network)
+						tshark -i enp0s10 (Internet)
+				Source: nc -v 87.248.214.2 22
+				Destination: nc -v -l 22
+
+
+
+
+
+
+	"FTP connections (in passive and active modes) to external FTP servers."
+
+		(From internal network to internet)
+			Router: tshark -i enp0s9 (Internal network)
+					tshark -i enp0s10 (Internet)
+			Source: ftp 87.248.214.2
+				-> name: sti_extra2
+				-> pass:
+				-> ls
+				-> get machine2.txt
+				-> passive
+				-> ls
+				-> get machine2.txt
+
+
+
+
+
+
+=========================== Snort ===========================
+
+Router:
+	snort --daq nfq --daq-var queue=0 -A alert_full -Q -c /usr/local/src/snort3/lua/snort.lua -R /etc/snort/snort.rules
+
+(From the internet to the www server)
+	Source: nc -v 23.214.219.132 80
+	Destination: nc -v -l 80
+
+	"UNION SQL Injection BLOCKED" -> send " union
+
+	"UNION SQL Injection BLOCKED" -> send ' union
+
+
+	"BOOLEAN SQL Injection BLOCKED" -> send " OR "1"="1"
+
+	"BOOLEAN SQL Injection BLOCKED" -> send ' OR '1'='1'
+	
+
+	"Cross-Site Scripting - markup injection BLOCKED" -> send <script>var i = 10;</script>
+
+	"Cross-Site Scripting - markup injection BLOCKED" -> send <b onmouseover=alert('ALERT!')>button!</b>
+
+
+
+
+
+
+
+	

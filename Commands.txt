@@ -1,0 +1,158 @@
+Máquina 2:
+	(DMZ to Internet)
+		route add -net 87.248.214.0/24 gw 23.214.219.254 
+	(Internal Network to Internet)
+		route add -net 87.248.214.0/24 gw 192.168.10.254 
+	(DMZ to Internal Network)
+		route add -net 192.168.10.0/24 gw 23.214.219.254 
+
+Máquina 3:
+	(Internet to DMZ)
+		route add -net 23.214.219.128/25 gw 87.248.214.97 
+	(Internet to Internal Network)
+		route add -net 192.168.10.0/24 gw 87.248.214.97 
+	(Internal Network to DMZ)
+		route add -net 23.214.219.128/25 gw 192.168.10.254 
+
+
+
+
+iptables -P OUTPUT DROP
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+
+iptables -A FORWARD -d 23.214.219.132 -s 87.248.214.0/24 -p tcp --dport http -j NFQUEUE --queue-num 0
+iptables -A FORWARD -s 23.214.219.132 -d 87.248.214.0/24 -p tcp --sport http -j NFQUEUE --queue-num 0
+
+iptables -A INPUT -s 23.214.219.130 -p tcp --sport domain -j ACCEPT
+iptables -A OUTPUT -d 23.214.219.130 -p tcp --dport domain -j ACCEPT
+
+iptables -A INPUT -s 87.248.214.1 -p tcp --sport domain -j ACCEPT
+iptables -A OUTPUT -d 87.248.214.1 -p tcp --dport domain -j ACCEPT
+
+iptables -A INPUT -s 87.248.214.2 -p tcp --sport domain -j ACCEPT
+iptables -A OUTPUT -d 87.248.214.2 -p tcp --dport domain -j ACCEPT
+
+iptables -A INPUT -s 23.214.219.130 -p udp --sport domain -j ACCEPT
+iptables -A OUTPUT -d 23.214.219.130 -p udp --dport domain -j ACCEPT
+
+iptables -A INPUT -s 87.248.214.1 -p udp --sport domain -j ACCEPT
+iptables -A OUTPUT -d 87.248.214.1 -p udp --dport domain -j ACCEPT
+
+iptables -A INPUT -s 87.248.214.2 -p udp --sport domain -j ACCEPT
+iptables -A OUTPUT -d 87.248.214.2 -p udp --dport domain -j ACCEPT
+
+iptables -A INPUT -s 192.168.10.0/24 -p tcp --dport ssh -j ACCEPT
+iptables -A OUTPUT -d 192.168.10.0/24 -p tcp --sport ssh -j ACCEPT
+
+iptables -A INPUT -s 23.214.219.133 -p tcp --dport ssh -j ACCEPT
+iptables -A OUTPUT -d 23.214.219.133 -p tcp --sport ssh -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.130 -p tcp --dport domain -j ACCEPT
+iptables -A FORWARD -s 23.214.219.130 -p tcp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.130 -p udp --dport domain -j ACCEPT
+iptables -A FORWARD -s 23.214.219.130 -p udp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 87.248.214.1 -s 23.214.219.130 -p tcp --dport domain -j ACCEPT
+iptables -A FORWARD -s 87.248.214.1 -d 23.214.219.130 -p tcp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 87.248.214.2 -s 23.214.219.130 -p tcp --dport domain -j ACCEPT
+iptables -A FORWARD -s 87.248.214.2 -d 23.214.219.130 -p tcp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 87.248.214.1 -s 23.214.219.130 -p udp --dport domain -j ACCEPT
+iptables -A FORWARD -s 87.248.214.1 -d 23.214.219.130 -p udp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 87.248.214.2 -s 23.214.219.130 -p udp --dport domain -j ACCEPT
+iptables -A FORWARD -s 87.248.214.2 -d 23.214.219.130 -p udp --sport domain -j ACCEPT
+
+
+iptables -A FORWARD -d 23.214.219.130 -s 87.248.214.1 -p tcp --dport domain -j ACCEPT
+iptables -A FORWARD -s 23.214.219.130 -d 87.248.214.1 -p tcp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.130 -s 87.248.214.1 -p udp --dport domain -j ACCEPT
+iptables -A FORWARD -s 23.214.219.130 -d 87.248.214.1 -p udp --sport domain -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.131 -p tcp --dport smtp -j ACCEPT
+iptables -A FORWARD -s 23.214.219.131 -p tcp --sport smtp -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.129 -p tcp --dport pop2 -j ACCEPT
+iptables -A FORWARD -s 23.214.219.129 -p tcp --sport pop2 -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.129 -p tcp --dport pop3 -j ACCEPT
+iptables -A FORWARD -s 23.214.219.129 -p tcp --sport pop3 -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.129 -p tcp --dport imap -j ACCEPT
+iptables -A FORWARD -s 23.214.219.129 -p tcp --sport imap -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.132 -p tcp --dport http -j ACCEPT
+iptables -A FORWARD -s 23.214.219.132 -p tcp --sport http -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.132 -p tcp --dport https -j ACCEPT
+iptables -A FORWARD -s 23.214.219.132 -p tcp --sport https -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.132 -p udp --dport https -j ACCEPT
+iptables -A FORWARD -s 23.214.219.132 -p udp --sport https -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.133 -p tcp --dport openvpn -j ACCEPT
+iptables -A FORWARD -s 23.214.219.133 -p tcp --sport openvpn -j ACCEPT
+
+iptables -A FORWARD -d 23.214.219.133 -p udp --dport openvpn -j ACCEPT
+iptables -A FORWARD -s 23.214.219.133 -p udp --sport openvpn -j ACCEPT
+
+iptables -A FORWARD -d 192.168.10.4 -s 23.214.219.133 -p tcp --dport postgres -j ACCEPT
+iptables -A FORWARD -s 192.168.10.4 -d 23.214.219.133 -p tcp --sport postgres -j ACCEPT
+
+iptables -t nat -A PREROUTING -s 87.248.214.0/24 -d 87.248.214.97 -p tcp --dport ftp -j DNAT --to-destination 192.168.10.5
+iptables -A FORWARD -d 192.168.10.5 -s 87.248.214.0/24 -p tcp --dport ftp -j ACCEPT
+iptables -A FORWARD -s 192.168.10.5 -d 87.248.214.0/24 -p tcp --sport ftp-data -j ACCEPT
+
+iptables -t nat -A PREROUTING -s 87.248.214.1 -d 87.248.214.97 -p tcp --dport ssh -j DNAT --to-destination 192.168.10.4
+iptables -A FORWARD -d 192.168.10.4 -s 87.248.214.1 -p tcp --dport ssh -j ACCEPT
+iptables -A FORWARD -s 192.168.10.4 -d 87.248.214.1 -p tcp --sport ssh -j ACCEPT
+
+iptables -t nat -A PREROUTING -s 87.248.214.2 -d 87.248.214.97 -p tcp --dport ssh -j DNAT --to-destination 192.168.10.4
+iptables -A FORWARD -d 192.168.10.4 -s 87.248.214.2 -p tcp --dport ssh -j ACCEPT
+iptables -A FORWARD -s 192.168.10.4 -d 87.248.214.2 -p tcp --sport ssh -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport domain -j SNAT --to-source 87.248.214.97
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport domain -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport domain -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p udp --dport domain -j SNAT --to-source 87.248.214.97
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p udp --dport domain -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p udp --sport domain -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport http -j SNAT --to-source 87.248.214.97
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport http -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport http -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport https -j SNAT --to-source 87.248.214.97
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport https -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport https -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p udp --dport https -j SNAT --to-source 87.248.214.97
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p udp --dport https -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p udp --sport https -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport ssh -j SNAT --to-source 87.248.214.97
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport ssh -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport ssh -j ACCEPT
+
+iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -d 87.248.214.0/24 -p tcp --dport ftp -j SNAT --to-source 87.248.214.97
+
+iptables -A FORWARD -d 87.248.214.0/24 -s 192.168.10.0/24 -p tcp --dport ftp -j ACCEPT
+iptables -A FORWARD -s 87.248.214.0/24 -d 192.168.10.0/24 -p tcp --sport ftp-data -j ACCEPT
+
+iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+
+
+
+
+
+
+
+
+
+
